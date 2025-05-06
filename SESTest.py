@@ -3,8 +3,8 @@ import boto3
 client = boto3.client(
     "ses",
     region_name="us-west-2",
-    aws_access_key_id="AKIATWBJ2MK4KTVBY7ZB",
-    aws_secret_access_key="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"
+    aws_access_key_id="AKIATWBJ2MK4IE2PMWFE",
+    aws_secret_access_key="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"
 )
 
 client.send_email(
