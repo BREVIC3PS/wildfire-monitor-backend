@@ -47,7 +47,7 @@ async function checkAndAlert() {
       `
       SELECT id, timestamp, latitude, longitude, probability
       FROM regional_fire_risk
-      WHERE probability >= 0.1
+      WHERE probability >= 0.5
         AND ST_Contains(
               ST_GeomFromText($1, 4326),
               ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
@@ -73,7 +73,7 @@ async function checkAndAlert() {
 您好，
 
 我们检测到在您定义的区域 “${region_name}” （ID: ${region_id}）内出现了
-概率 ≥ 70% 的火灾预测点。请立即关注该区域并采取必要的安全防范措施。
+概率 ≥ 50% 的火灾预测点。请立即关注该区域并采取必要的安全防范措施。
 
 —— 云端野火监测平台
               `.trim(),
