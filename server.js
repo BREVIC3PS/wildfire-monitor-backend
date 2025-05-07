@@ -38,8 +38,8 @@ app.post('/api/users', async (req, res) => {
 
 // 2) 前端上传区域：把 GeoJSON 多边形存进 regions
 app.post('/api/regions', async (req, res) => {
-  const { userId, name, geojson } = req.body;
-  userId = 1; // Set a default userId for testing
+  const { userId = 1, name, geojson } = req.body;
+  //userId = 1; // Set a default userId for testing
   // 假设 geojson 是一个有效的 Feature 或 Polygon 对象
   const wkt = JSON.stringify(geojson.geometry ?? geojson); // 或直接存 JSON
   const result = await pool.query(
