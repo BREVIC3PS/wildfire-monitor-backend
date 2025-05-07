@@ -74,20 +74,30 @@ app.post('/api/regions', async (req, res) => {
   console.log(`→ 新建 Region ${result.rows[0].id} for user ${userId}`);
 });
 
-// 3) 查询某用户的所有区域
-app.get('/api/users/:id/regions', async (req, res) => {
-  const userId = req.params.id;
-  const result = await pool.query(
-    `SELECT id, name, ST_AsGeoJSON(geom)::json AS geojson
-     FROM regions WHERE user_id=$1`,
-    [userId]
-  );
-  res.json(result.rows.map(r => ({
-    id: r.id,
-    name: r.name,
-    geojson: r.geojson
-  })));
-});
+// 3) 根据 email 获取所有 regions
+app.get('/api/regions', async (req, res) => {
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ error: '缺少 email 参数' });
+    }
+    // 复用之前的 helper：找到或新建用户
+    const userId = await findOrCreateUser(email);
+  
+    const result = await pool.query(
+      `SELECT id, name, ST_AsGeoJSON(geom)::json AS geojson
+         FROM regions
+        WHERE user_id = $1`,
+      [userId]
+    );
+  
+    res.json(
+      result.rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        geojson: r.geojson
+      }))
+    );
+  });
 
 // 4) 更新（编辑）某个区域
 app.put('/api/regions/:id', async (req, res) => {
