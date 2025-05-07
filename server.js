@@ -8,7 +8,7 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-// 配置你的本地 Postgres
+// Configure your local Postgres
 const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
@@ -18,14 +18,14 @@ const pool = new Pool({
 });
 
 const pool2 = new Pool({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'fire_db',
-    password: 'postgres',
-    port: 5432,
-  });
+  user: 'postgres',
+  host: 'localhost',
+  database: 'fire_db',
+  password: 'postgres',
+  port: 5432,
+});
 
-// 简单的 CORS 设置
+// Simple CORS settings
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE');
@@ -33,7 +33,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 根据 email 查用户，没有就创建
+// Find user by email, create if not found
 async function findOrCreateUser(email) {
   const r1 = await pool.query(
     'SELECT id FROM users WHERE email=$1',
@@ -50,7 +50,7 @@ async function findOrCreateUser(email) {
   }
 }
 
-// 1) 注册用户（如果你前端有专门注册，这里也可以保留）
+// 1) Register user (keep this if your frontend has dedicated registration)
 app.post('/api/users', async (req, res) => {
   const { email } = req.body;
   const result = await pool.query(
@@ -60,15 +60,15 @@ app.post('/api/users', async (req, res) => {
   res.json(result.rows[0]);
 });
 
-// 2) 创建新区域
+// 2) Create a new region
 app.post('/api/regions', async (req, res) => {
   const { email, name, geojson } = req.body;
   if (!email || !geojson) {
-    return res.status(400).json({ error: '缺少 email 或 geojson' });
+    return res.status(400).json({ error: 'Missing email or geojson' });
   }
 
   const userId = await findOrCreateUser(email);
-  // 将 GeoJSON 对象转为字符串传给 ST_GeomFromGeoJSON
+  // Convert GeoJSON object to string for ST_GeomFromGeoJSON
   const geojsonStr = JSON.stringify(geojson.geometry ?? geojson);
 
   const result = await pool.query(
@@ -79,105 +79,83 @@ app.post('/api/regions', async (req, res) => {
   );
 
   res.json({ regionId: result.rows[0].id });
-  console.log(`→ 新建 Region ${result.rows[0].id} for user ${userId}`);
+  console.log(`→ Created Region ${result.rows[0].id} for user ${userId}`);
 });
 
-// 3) 根据 email 获取所有 regions
+// 3) Get all regions by email
 app.get('/api/regions', async (req, res) => {
-    const { email } = req.query;
-    if (!email) {
-      return res.status(400).json({ error: '缺少 email 参数' });
-    }
-    // 复用之前的 helper：找到或新建用户
-    const userId = await findOrCreateUser(email);
-  
-    const result = await pool.query(
-      `SELECT id, name, ST_AsGeoJSON(geom)::json AS geojson
-         FROM regions
-        WHERE user_id = $1`,
-      [userId]
-    );
-  
-    res.json(
-      result.rows.map(r => ({
-        id: r.id,
-        name: r.name,
-        geojson: r.geojson
-      }))
-    );
-  });
-
-// 4) 更新（编辑）某个区域
-app.put('/api/regions/:id', async (req, res) => {
-  const regionId = req.params.id;
-  const { email, name, geojson } = req.body;
-  if (!email || !geojson) {
-    return res.status(400).json({ error: '缺少 email 或 geojson' });
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email parameter' });
   }
+  // Reuse helper: find or create user
+  const userId = await findOrCreateUser(email);
 
-  // 可选：验证 email 是否对应该 region 的 owner
-  const geojsonStr = JSON.stringify(geojson.geometry ?? geojson);
-  await pool.query(
-    `UPDATE regions
-     SET name    = $1,
-         geom    = ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)
-     WHERE id = $3`,
-    [name, geojsonStr, regionId]
+  const result = await pool.query(
+    `SELECT id, name, ST_AsGeoJSON(geom)::json AS geojson
+       FROM regions
+      WHERE user_id = $1`,
+    [userId]
   );
 
-  res.json({ regionId });
-  console.log(`→ 更新 Region ${regionId}`);
+  res.json(
+    result.rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      geojson: r.geojson
+    }))
+  );
 });
 
-// 5) 删除某个区域
+// 5) Delete a region
 app.delete('/api/regions/:id', async (req, res) => {
-    const regionId = parseInt(req.params.id, 10);
-    const { email } = req.query;              // ?email=...
-    if (!email) {
-      return res.status(400).json({ error: '缺少 email 参数' });
-    }
-    if (Number.isNaN(regionId)) {
-        return res.status(400).json({ error: '无效的 region id' });
-    }
-    const userId = await findOrCreateUser(email);
-  
-    // 可加一层校验：确保这个 region 属于当前 userId
-    await pool.query(
-      `DELETE FROM regions
-       WHERE id = $1
-         AND user_id = $2`,
-      [regionId, userId]
-    );
-  
-    console.log(`→ 删除 Region ${regionId}（用户 ${userId}）`);
-    res.json({ regionId });
-  });
+  const regionId = parseInt(req.params.id, 10);
+  const { email } = req.query;              // ?email=...
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email parameter' });
+  }
+  if (Number.isNaN(regionId)) {
+    return res.status(400).json({ error: 'Invalid region id' });
+  }
+  const userId = await findOrCreateUser(email);
+
+  // Optional validation: ensure the region belongs to the current userId
+  await pool.query(
+    `DELETE FROM regions
+     WHERE id = $1
+       AND user_id = $2`,
+    [regionId, userId]
+  );
+
+  console.log(`→ Deleted Region ${regionId} (User ${userId})`);
+  res.json({ regionId });
+});
 
 // GET /api/regional_fire_risk?limit=5
 app.get('/api/regional_fire_risk', async (req, res) => {
-    // 从 query 里读取 limit（默认为 5）
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 5));
-  
-    const sql = `
-      SELECT 
-        id,
-        timestamp,
-        latitude,
-        longitude,
-        probability
-      FROM regional_fire_risk
-      ORDER BY probability DESC
-      LIMIT $1
-    `;
-  
-    try {
-      const { rows } = await pool2.query(sql, [limit]);
-      res.json(rows);
-    } catch (err) {
-      console.error('DB query failed:', err);
-      res.status(500).json({ error: 'Internal Server Error' });
-    }
-  });
+  // Read limit from query (default is 5)
+  const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 5));
+
+  const sql = `
+    SELECT 
+      id,
+      timestamp,
+      latitude,
+      longitude,
+      probability
+    FROM regional_fire_risk
+    ORDER BY probability DESC
+    LIMIT $1
+  `;
+
+  try {
+    const { rows } = await pool2.query(sql, [limit]);
+    res.json(rows);
+  } catch (err) {
+    console.error('DB query failed:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`API listening on ${PORT}`));

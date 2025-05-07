@@ -2,16 +2,16 @@
 const { Pool } = require('pg');
 const AWS = require('aws-sdk');
 
-// ——— 1) AWS SES 配置 ———
+// ——— 1) AWS SES Configuration ———
 AWS.config.update({
   region: 'us-west-2',
-  accessKeyId: 'AKIATWBJ2MK4IE2PMWFE',      // 推荐改用环境变量
-  secretAccessKey: 'Yy817+MwyrZJ62NxH8lvSWaCNwJM4k5pHi52gs2S' 
+  accessKeyId: 'AKIATWBJ2MK4IE2PMWFE',      // Recommended to use environment variables
+  secretAccessKey: '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'
 });
 const ses = new AWS.SES({ apiVersion: '2010-12-01' });
 
-// ——— 2) Postgres 连接 ———
-// weather_db: 存 regions & users
+// ——— 2) Postgres Connection ———
+// weather_db: stores regions & users
 const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
@@ -20,7 +20,7 @@ const pool = new Pool({
   port: 5432,
 });
 
-// fire_db: 存 regional_fire_risk
+// fire_db: stores regional_fire_risk
 const firePool = new Pool({
   user: 'postgres',
   host: 'localhost',
@@ -30,7 +30,7 @@ const firePool = new Pool({
 });
 
 async function checkAndAlert() {
-  // 1. 先读出所有用户的 regions（取 WKT）
+  // 1. First, retrieve all user regions (get WKT)
   const regionsRes = await pool.query(`
     SELECT
       r.id         AS region_id,
@@ -42,7 +42,7 @@ async function checkAndAlert() {
   `);
 
   for (let { region_id, user_email, region_name, wkt } of regionsRes.rows) {
-    // 2. 在 fire_db 中查询：概率 ≥ 0.7 且落在该多边形内部
+    // 2. Query fire_db: probability ≥ 0.5 and falls within the polygon
     const fireRes = await firePool.query(
       `
       SELECT id, timestamp, latitude, longitude, probability
@@ -52,35 +52,42 @@ async function checkAndAlert() {
               ST_GeomFromText($1, 4326),
               ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
             )
-      LIMIT 1  -- 只需要知道是否存在
+      LIMIT 1  -- Only need to know if it exists
       `,
       [wkt]
     );
 
     if (fireRes.rows.length > 0) {
-      // 3. 构造并发送 SES 预警邮件
+      const { latitude, longitude, probability } = fireRes.rows[0];
+
+      // 3. Construct and send SES alert email
       const params = {
-        Source: 'kwang655@usc.edu',
-        Destination: { ToAddresses: [user_email] },
-        Message: {
-          Subject: {
-            Data: `【野火风险警报】您关注的“${region_name}”区域有高风险火点`,
-            Charset: 'UTF-8'
-          },
-          Body: {
-            Text: {
-              Data: `
-您好，
+      Source: 'kwang655@usc.edu',
+      Destination: { ToAddresses: [user_email] },
+      Message: {
+        Subject: {
+        Data: `【Wildfire Risk Alert】High-risk fire point detected in your region "${region_name}"`,
+        Charset: 'UTF-8'
+        },
+        Body: {
+        Text: {
+          Data: `
+  Hello,
 
-我们检测到在您定义的区域 “${region_name}” （ID: ${region_id}）内出现了
-概率 ≥ 50% 的火灾预测点。请立即关注该区域并采取必要的安全防范措施。
+  We have detected a predicted fire point with the following details within your defined region "${region_name}" (ID: ${region_id}):
 
-—— 云端野火监测平台
-              `.trim(),
-              Charset: 'UTF-8'
-            }
-          }
+  - Latitude: ${latitude}
+  - Longitude: ${longitude}
+  - Fire Probability: ${(probability * 100).toFixed(2)}%
+
+  Please pay immediate attention to this area and take necessary safety precautions.
+
+  —— Cloud Wildfire Monitoring Platform
+          `.trim(),
+          Charset: 'UTF-8'
         }
+        }
+      }
       };
 
       try {
@@ -93,10 +100,10 @@ async function checkAndAlert() {
   }
 }
 
-// 每分钟运行一次，也可以改成你需要的频率
+// Run every minute, or adjust to your desired frequency
 setInterval(() => {
   checkAndAlert().catch(console.error);
 }, 60 * 1000);
 
-// 启动时立即执行一次
+// Execute once immediately on startup
 checkAndAlert().catch(console.error);
