@@ -123,14 +123,23 @@ app.put('/api/regions/:id', async (req, res) => {
 
 // 5) 删除某个区域
 app.delete('/api/regions/:id', async (req, res) => {
-  const regionId = req.params.id;
-  await pool.query(
-    'DELETE FROM regions WHERE id = $1',
-    [regionId]
-  );
-  res.json({ regionId });
-  console.log(`→ 删除 Region ${regionId}`);
-});
-
+    const regionId = req.params.id;           // URL 参数
+    const { email } = req.query;              // ?email=...
+    if (!email) {
+      return res.status(400).json({ error: '缺少 email 参数' });
+    }
+    const userId = await findOrCreateUser(email);
+  
+    // 可加一层校验：确保这个 region 属于当前 userId
+    await pool.query(
+      `DELETE FROM regions
+       WHERE id = $1
+         AND user_id = $2`,
+      [regionId, userId]
+    );
+  
+    console.log(`→ 删除 Region ${regionId}（用户 ${userId}）`);
+    res.json({ regionId });
+  });
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`API listening on ${PORT}`));
