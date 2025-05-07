@@ -123,10 +123,13 @@ app.put('/api/regions/:id', async (req, res) => {
 
 // 5) 删除某个区域
 app.delete('/api/regions/:id', async (req, res) => {
-    const regionId = req.params.id;           // URL 参数
+    const regionId = parseInt(req.params.id, 10);
     const { email } = req.query;              // ?email=...
     if (!email) {
       return res.status(400).json({ error: '缺少 email 参数' });
+    }
+    if (Number.isNaN(regionId)) {
+        return res.status(400).json({ error: '无效的 region id' });
     }
     const userId = await findOrCreateUser(email);
   
