@@ -17,6 +17,14 @@ const pool = new Pool({
   port: 5432,
 });
 
+const pool2 = new Pool({
+    user: 'postgres',
+    host: 'localhost',
+    database: 'fire_db',
+    password: 'postgres',
+    port: 5432,
+  });
+
 // 简单的 CORS 设置
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -144,5 +152,32 @@ app.delete('/api/regions/:id', async (req, res) => {
     console.log(`→ 删除 Region ${regionId}（用户 ${userId}）`);
     res.json({ regionId });
   });
+
+// GET /api/regional_fire_risk?limit=5
+app.get('/api/regional_fire_risk', async (req, res) => {
+    // 从 query 里读取 limit（默认为 5）
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 5));
+  
+    const sql = `
+      SELECT 
+        id,
+        timestamp,
+        latitude,
+        longitude,
+        probability
+      FROM regional_fire_risk
+      ORDER BY probability DESC
+      LIMIT $1
+    `;
+  
+    try {
+      const { rows } = await pool2.query(sql, [limit]);
+      res.json(rows);
+    } catch (err) {
+      console.error('DB query failed:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`API listening on ${PORT}`));
