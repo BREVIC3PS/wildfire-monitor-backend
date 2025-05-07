@@ -5,8 +5,8 @@ const AWS = require('aws-sdk');
 // ——— 1) AWS SES 配置 ———
 AWS.config.update({
   region: 'us-west-2',
-  accessKeyId: AKIATWBJ2MK4IE2PMWFE,      // 推荐改用环境变量
-  secretAccessKey: Yy817+MwyrZJ62NxH8lvSWaCNwJM4k5pHi52gs2S
+  accessKeyId: 'AKIATWBJ2MK4IE2PMWFE',      // 推荐改用环境变量
+  secretAccessKey: 'Yy817+MwyrZJ62NxH8lvSWaCNwJM4k5pHi52gs2S' 
 });
 const ses = new AWS.SES({ apiVersion: '2010-12-01' });
 
