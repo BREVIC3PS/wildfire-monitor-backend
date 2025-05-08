@@ -57,8 +57,8 @@ async function checkAndAlert() {
     );
 
     if (fireRes.rows.length > 0) {
-      const firePoints = fireRes.rows.map(({ latitude, longitude, probability }) => 
-        `- Latitude: ${latitude}, Longitude: ${longitude}, Probability: ${(probability * 100).toFixed(2)}%`
+      const firePoints = fireRes.rows.map(({ latitude, longitude, probability, timestamp }) => 
+        `- Time: ${new Date(timestamp).toLocaleString()}, Latitude: ${latitude.toFixed(2)}, Longitude: ${longitude.toFixed(2)}, Probability: ${(probability * 100).toFixed(2)}%`
       ).join('\n');
 
       // 3. Construct and send SES alert email
