@@ -42,23 +42,24 @@ async function checkAndAlert() {
   `);
 
   for (let { region_id, user_email, region_name, wkt } of regionsRes.rows) {
-    // 2. Query fire_db: probability ≥ 0.5 and falls within the polygon
+    // 2. Query fire_db: probability ≥ 0.3 and falls within the polygon
     const fireRes = await firePool.query(
       `
       SELECT id, timestamp, latitude, longitude, probability
       FROM regional_fire_risk
-      WHERE probability >= 0.5
+      WHERE probability >= 0.3
         AND ST_Contains(
               ST_GeomFromText($1, 4326),
               ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
             )
-      LIMIT 1  -- Only need to know if it exists
       `,
       [wkt]
     );
 
     if (fireRes.rows.length > 0) {
-      const { latitude, longitude, probability } = fireRes.rows[0];
+      const firePoints = fireRes.rows.map(({ latitude, longitude, probability }) => 
+        `- Latitude: ${latitude}, Longitude: ${longitude}, Probability: ${(probability * 100).toFixed(2)}%`
+      ).join('\n');
 
       // 3. Construct and send SES alert email
       const params = {
@@ -66,7 +67,7 @@ async function checkAndAlert() {
       Destination: { ToAddresses: [user_email] },
       Message: {
         Subject: {
-        Data: `【Wildfire Risk Alert】High-risk fire point detected in your region "${region_name}"`,
+        Data: `【Wildfire Risk Alert】High-risk fire points detected in your region "${region_name}"`,
         Charset: 'UTF-8'
         },
         Body: {
@@ -74,11 +75,9 @@ async function checkAndAlert() {
           Data: `
   Hello,
 
-  We have detected a predicted fire point with the following details within your defined region "${region_name}" (ID: ${region_id}):
+  We have detected predicted fire points with the following details within your defined region "${region_name}" (ID: ${region_id}):
 
-  - Latitude: ${latitude}
-  - Longitude: ${longitude}
-  - Fire Probability: ${(probability * 100).toFixed(2)}%
+  ${firePoints}
 
   Please pay immediate attention to this area and take necessary safety precautions.
 
