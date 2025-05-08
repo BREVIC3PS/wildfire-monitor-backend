@@ -47,7 +47,7 @@ async function checkAndAlert() {
       `
       SELECT id, timestamp, latitude, longitude, probability
       FROM regional_fire_risk
-      WHERE probability >= 0.3
+      WHERE probability >= 0.21
         AND ST_Contains(
               ST_GeomFromText($1, 4326),
               ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)
